@@ -22,7 +22,7 @@ py::list findMinVertexCover(const int N, const py::list& E)
 
   // add edge constraints; rhs is a constant 1 for each constraint
   for (int i = 0; i < len(E); ++i) {
-    boost::python::tuple e = py::extract<py::tuple>(E[i]);
+    py::tuple e = py::extract<py::tuple>(E[i]);
     rowindofcol[(int)py::extract<int>(e[0])].push_back(i);
     rowindofcol[(int)py::extract<int>(e[1])].push_back(i);
     constrvalues[(int)py::extract<int>(e[0])].push_back(1.);
