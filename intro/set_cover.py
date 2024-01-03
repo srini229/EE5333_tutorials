@@ -8,14 +8,12 @@ def findSetCover(N, S):
     x = [model.add_var(var_type=mip.BINARY,\
         name=f"x_{s}") for s in range(len(S))]
     model.objective = mip.minimize(mip.xsum(x))
-
     occ = [[] for _ in range(N)]
     for i in range(len(S)):
       for j in S[i]: # store the set indices to which i belongs
         occ[j].append(i)
     for xi in occ:
       model += mip.xsum(x[i] for i in xi) >= 1
-
     model.optimize()
     if model.status == mip.OptimizationStatus.OPTIMAL:
         return [S[i] for i in range(len(S)) if x[i].x >= 0.9]
