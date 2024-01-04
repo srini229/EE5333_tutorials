@@ -1,0 +1,40 @@
+MACRO INV_X1
+  ORIGIN 0 0 ;
+  SIZE 0.38 BY 1.4 ;
+  PIN A
+    DIRECTION INPUT ;
+    USE SIGNAL ;
+    PORT
+      LAYER metal1 ;
+        RECT 0.06 0.525 0.165 0.7 ;
+    END
+  END A
+  PIN ZN
+    DIRECTION OUTPUT ;
+    USE SIGNAL ;
+    PORT
+      LAYER metal1 ;
+        RECT 0.23 0.15 0.325 1.25 ;
+    END
+  END ZN
+  PIN VDD
+    DIRECTION INOUT ;
+    USE POWER ;
+    SHAPE ABUTMENT ;
+    PORT
+      LAYER metal1 ;
+        RECT 0 1.315 0.38 1.485 ;
+        RECT 0.04 0.975 0.11 1.485 ;
+    END
+  END VDD
+  PIN VSS
+    DIRECTION INOUT ;
+    USE GROUND ;
+    SHAPE ABUTMENT ;
+    PORT
+      LAYER metal1 ;
+        RECT 0 -0.085 0.38 0.085 ;
+        RECT 0.04 -0.085 0.11 0.425 ;
+    END
+  END VSS
+END INV_X1
