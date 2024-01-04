@@ -36,7 +36,7 @@ py::list findSetCover(const int N, const py::list& S)
   }
   py::list setCover;
   auto var = solver.getSolution();
-  solver.writeLp("setcover.lp");
+  solver.writeLp("setcover");
   for (int i = 0; i < len(S); ++i) {
     if (var[i] >= 0.9) setCover.append(S[i]);
   }

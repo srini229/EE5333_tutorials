@@ -37,6 +37,7 @@ py::list findMinVertexCover(const int N, const py::list& E)
 
   py::list vertexCover;
   auto sol = solver.getSolution();
+  solver.writeLp("minvertexcover");
   if (!sol.empty()) {
     for (int i = 0; i < N; ++i) {
       if (sol[i] >= 0.9) vertexCover.append(i);
