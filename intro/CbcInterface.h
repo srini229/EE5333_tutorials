@@ -93,12 +93,13 @@ namespace CbcIF {
         model.setLogLevel(0);
         const char* argv[] = {"", "-log", "0", "-solve"};
         CbcMain(4, argv, model);
-        std::vector<double> sol(_numVars, 0);
+        std::vector<double> sol;
+        sol.reserve(_numVars);
         assert(_numVars == model.getNumCols());
         if (model.status() == 0) {
           double* var = model.bestSolution();
-          for (int i = 0; i < model.getNumCols(); ++i) {
-            sol[i] = var[i];
+          if (var) {
+            sol.insert(sol.end(), var, var + _numVars);
           }
         }
         return sol;
