@@ -1,0 +1,64 @@
+VERSION 5.8 ;
+DIVIDERCHAR "/" ;
+BUSBITCHARS "[]" ;
+DESIGN example ;
+UNITS DISTANCE MICRONS 2000 ;
+
+DIEAREA ( 83600 71820 ) ( 104400 91200 ) ;
+
+COMPONENTS 6 ;
+- a NAND2_X1 ;
+- b NAND2_X1 ;
+- c NAND2_X1 ;
+- d NAND2_X1 ;
+- e NAND2_X1 ;
+- f INV_X1 ;
+END COMPONENTS
+
+PINS 0 ;
+- n1 + NET n1 + DIRECTION INPUT ;
+- n2 + NET n2 + DIRECTION INPUT ;
+- n3 + NET n3 + DIRECTION INPUT ;
+- n4 + NET n4 + DIRECTION INPUT ;
+- n5 + NET n5 + DIRECTION INPUT ;
+- n10 + NET n10 + DIRECTION OUTPUT ;
+- n11 + NET n11 + DIRECTION OUTPUT ;
+END PINS
+
+NETS 11 ;
+- n1
+  ( PIN n1 ) ( a A1 )
+ ;
+- n2
+  ( PIN n2 ) ( a A2 ) ( b A1 )
+ ;
+- n3
+  ( PIN n3 ) ( b A2 )
+ ;
+- n4
+  ( PIN n4 ) ( c A2 )
+ ;
+- n5
+  ( PIN n5 ) ( d A2 )
+ ;
+- n6
+  ( a ZN ) ( e A1 )
+ ;
+- n7
+  ( b ZN ) ( c A1 ) ( d A1 )
+ ;
+- n8
+  ( c ZN ) ( e A2 )
+ ;
+- n9
+  ( d ZN ) ( f A )
+ ;
+- n10
+  ( e ZN ) ( PIN n10 )
+ ;
+- n11
+  ( f ZN ) ( PIN n11 )
+ ;
+END NETS
+
+END DESIGN
