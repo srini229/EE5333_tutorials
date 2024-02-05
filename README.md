@@ -4,3 +4,4 @@ Code snippets, assignments, and tutorials for EE5333 Introduction to Physical De
 
 # [1. Introduction](intro)
 # [2. Partition](part)
+# [3. Floorplanning](fp)
