@@ -3,9 +3,11 @@ import numpy as np
 from math import sqrt
 import time
 
-def conjugate_gradient(A, b, eps = 1e-2):
+# Solve linear system of equations using conjugate gradient method
+# Use RMS of residue within a margin of eps to stop
+def solveUsingCG(A, b, eps = 1e-4):
     x    = np.zeros(b.shape)
-    r    = b #- A @ x # residue
+    r    = b # residue
     d    = r # direction
     rTr   = r.T @ r
     for i in range(A.shape[0]):
@@ -15,12 +17,12 @@ def conjugate_gradient(A, b, eps = 1e-2):
         r        = r - alpha * Ad
         rTr_prev = rTr
         rTr = r.T @ r
-        #print('err : ', sqrt(rTr))
         if sqrt(rTr) <= eps: return x
         beta   = rTr / rTr_prev
         d      = r + beta * d
     return x
 
+# Class to hold neighbours and pins connected to each standard cell
 class Vertex:
     def __init__(self, c):
         self._comp = c
@@ -31,8 +33,11 @@ class Vertex:
         
     def __repr__(self):
         return self._comp.name() + f' {self._nbrs} {self._pinNbrs}'
-        
+
+# Frame A, b_x and b_y matrices and solve for x and y coordinates of each cell
 def solve(Vertices):
+    for i in range(len(Vertices)):
+        Vertices[i]._comp.setLocation(0, 0)
     A = np.zeros((len(Vertices), len(Vertices)))
     bx = np.zeros((len(Vertices), 1))
     by = np.zeros((len(Vertices), 1))
@@ -44,16 +49,14 @@ def solve(Vertices):
             bx[Vertices[i]._index] += p.x
             by[Vertices[i]._index] += p.y
     assert(np.all(A.T == A))
-    print('solving')
     t = time.time()
-    solx = conjugate_gradient(A, bx)
-    soly = conjugate_gradient(A, by)
+    solx = solveUsingCG(A, bx)
+    soly = solveUsingCG(A, by)
     print('runtime :', time.time() - t)
     for i in range(len(Vertices)):
         Vertices[i]._comp.setLocation(int(solx[i]), int(soly[i]))
-    return (np.median(solx), np.median(soly))
 
-
+# Bin class that holds the vertices belonging to a bin and virtual pins
 class Bin:
     def __init__(self, index, bb):
         self._index = index
@@ -61,10 +64,11 @@ class Bin:
         self._bbox = bb
         hw = (bb[1][0] - bb[0][0])/2.
         hh = (bb[1][1] - bb[0][1])/2.
-        self._pins = [LEFDEFParser.Point(int(bb[0][0] + hw), int(bb[0][1])),      #0 South pin
+        # create virtual pins on the boundary of each bin; one each for the 8 directions 
+        self._vpins = [LEFDEFParser.Point(int(bb[0][0] + hw), int(bb[0][1])),      #0 South pin
                       LEFDEFParser.Point(int(bb[0][0] + hw), int(bb[1][1])),      #1 North pin
-                      LEFDEFParser.Point(int(bb[1][0]),      int(bb[0][0])),      #2 South East pin
-                      LEFDEFParser.Point(int(bb[0][0]),      int(bb[0][0])),      #3 South West pin
+                      LEFDEFParser.Point(int(bb[1][0]),      int(bb[0][1])),      #2 South East pin
+                      LEFDEFParser.Point(int(bb[0][0]),      int(bb[0][1])),      #3 South West pin
                       LEFDEFParser.Point(int(bb[0][0]),      int(bb[0][1] + hh)), #4 East pin
                       LEFDEFParser.Point(int(bb[1][0]),      int(bb[0][1] + hh)), #5 West pin
                       LEFDEFParser.Point(int(bb[1][0]),      int(bb[1][1])),      #6 North East pin
@@ -74,93 +78,109 @@ class Bin:
     def rebuild(self):
         for i in range(len(self._vertices)):
             self._vertices[i]._index = i
-            actNbrs = list()
+            totalNbrs = len(self._vertices[i]._pinNbrs) + len(self._vertices[i]._nbrs)
+            pnbrs = list()
             for pi in range(len(self._vertices[i]._pinNbrs)):
                 p = self._vertices[i]._pinNbrs[pi]
-                if p.x < self._bbox[0][0]:
-                    if p.y < self._bbox[0][1]: # south west
-                        self._vertices[i]._pinNbrs[pi] = self._pins[3]
-                    elif p.y > self._bbox[0][1]: # north west
-                        self._vertices[i]._pinNbrs[pi] = self._pins[7]
-                    else: #west
-                        self._vertices[i]._pinNbrs[pi] = self._pins[5]
-                elif p.x > self._bbox[1][0]:
-                    if p.y < self._bbox[0][1]: # south east
-                        self._vertices[i]._pinNbrs[pi] = self._pins[2]
-                    elif p.y > self._bbox[0][1]: # north east
-                        self._vertices[i]._pinNbrs[pi] = self._pins[6]
-                    else: #east
-                        self._vertices[i]._pinNbrs[pi] = self._pins[4]
-                elif p.y < self._bbox[0][1]:#south
-                    self._vertices[i]._pinNbrs[pi] = self._pins[0]
-                elif p.y > self._bbox[1][1]:#north
-                    self._vertices[i]._pinNbrs[pi] = self._pins[1]
+                if p.x >= self._bbox[0][0] and p.x <= self._bbox[1][0] and p.y >= self._bbox[0][1] and p.y <= self._bbox[1][1]:
+                    pnbrs.append(p)
+                else:
+                    if p.x < self._bbox[0][0]:
+                        if p.y < self._bbox[0][1]: # south west
+                            pnbrs.append(self._vpins[3])
+                        elif p.y > self._bbox[0][1]: # north west
+                            pnbrs.append(self._vpins[7])
+                        else: #west
+                            pnbrs.append(self._vpins[5])
+                    elif p.x > self._bbox[1][0]:
+                        if p.y < self._bbox[0][1]: # south east
+                            pnbrs.append(self._vpins[2])
+                        elif p.y > self._bbox[0][1]: # north east
+                            pnbrs.append(self._vpins[6])
+                        else: #east
+                            pnbrs.append(self._vpins[4])
+                    elif p.y < self._bbox[0][1]:#south
+                        pnbrs.append(self._vpins[0])
+                    elif p.y > self._bbox[1][1]:#north
+                        pnbrs.append(self._vpins[1])
+            self._vertices[i]._pinNbrs = pnbrs
+            actNbrs = list() # remove neighbours not in this bin and add a connection to the corresponding pin at the boundary
             for nbr in self._vertices[i]._nbrs:
-                if nbr._bin != self._index:
-                    index = self._index
-                    nBinIndex = nbr._bin._index
+                index = self._index
+                nBinIndex = nbr._bin._index
+                if nBinIndex != index:
                     if nBinIndex[1] == index[1]: # east or west
                         if nBinIndex[0] < index[0]: #west
-                            self._vertices[i]._pinNbrs.append(self._pins[5])
+                            self._vertices[i]._pinNbrs.append(self._vpins[5])
                         else:
-                            self._vertices[i]._pinNbrs.append(self._pins[4])
+                            self._vertices[i]._pinNbrs.append(self._vpins[4])
                     elif nBinIndex[0] == index[0]: # south or north
                         if nBinIndex[1] < index[1]: #south
-                            self._vertices[i]._pinNbrs.append(self._pins[0])
+                            self._vertices[i]._pinNbrs.append(self._vpins[0])
                         else:
-                            self._vertices[i]._pinNbrs.append(self._pins[1])
+                            self._vertices[i]._pinNbrs.append(self._vpins[1])
                     elif nBinIndex[0] < index[0]: # south west or north west
                         if nBinIndex[1] < index[1]: #south
-                            self._vertices[i]._pinNbrs.append(self._pins[3])
+                            self._vertices[i]._pinNbrs.append(self._vpins[3])
                         else:
-                            self._vertices[i]._pinNbrs.append(self._pins[7])
+                            self._vertices[i]._pinNbrs.append(self._vpins[7])
                     elif nBinIndex[0] > index[0]: # south east or north east
                         if nBinIndex[1] < index[1]: #south
-                            self._vertices[i]._pinNbrs.append(self._pins[2])
+                            self._vertices[i]._pinNbrs.append(self._vpins[2])
                         else:
-                            self._vertices[i]._pinNbrs.append(self._pins[6])
+                            self._vertices[i]._pinNbrs.append(self._vpins[6])
                 else:
                     actNbrs.append(nbr)
             self._vertices[i]._nbrs = actNbrs
+            assert(totalNbrs == len(self._vertices[i]._pinNbrs) + len(self._vertices[i]._nbrs))
+            #self._vertices[i]._pinNbrs = list(set(self._vertices[i]._pinNbrs))
         return
 
-def createBins(med, Vertices, bbox):
+# bins : quadrisection
+# create bins from the previous iterations solution
+def createBins(Vertices, bbox):
     w = (bbox[1][0] - bbox[0][0])/2.
     h = (bbox[1][1] - bbox[0][1])/2.
     bins = [[None, None], [None, None]]
     for i in range(2):
         for j in range(2):
             bins[i][j] = Bin((i, j), ((bbox[0][0] + i * w, bbox[0][1] + j * h), (bbox[0][0] + (i + 1) * w, bbox[0][1] + (j + 1)*h)))
-    for i in range(len(Vertices)):
-        xi = 0 if Vertices[i]._comp.location().x <= med[0] else 1
-        yi = 0 if Vertices[i]._comp.location().y <= med[1] else 1
-        bins[xi][yi]._vertices.append(Vertices[i])
-        Vertices[i]._bin = bins[xi][yi]
+
+    Vertices.sort(key=lambda v: v._comp.location().x)
+    for xi in range(2):
+        if 0 == xi: vec = Vertices[0:int(len(Vertices)/2)]
+        else:       vec = Vertices[int(len(Vertices)/2):]
+        vec.sort(key=lambda v:v._comp.location().y)
+        for yi in range(2):
+            if 0 == yi: bins[xi][yi]._vertices = vec[0:int(len(vec)/2)]
+            else:       bins[xi][yi]._vertices = vec[int(len(vec)/2):]
+            for v in bins[xi][yi]._vertices:
+                v._bin = bins[xi][yi]
     for i in range(len(bins)):
         for j in range(len(bins[i])):
             bins[i][j].rebuild()
     return bins
 
+# Iteratively quadrisection and solve
 def solveIter(V, bbox, outfile, d):
-    med = solve(V)
+    print(f'solving : level 0')
+    solve(V)
     d.writeDEF(f'{outfile}_iter0.def')
-    bins = createBins(med, V, bbox)
-    med = []
-    for i in range(len(bins)):
-        med.append([])
-        for j in range(len(bins[i])):
-            med[i].append(solve(bins[i][j]._vertices))
-    d.writeDEF(f'{outfile}_iter1.def')
-    '''
-    for i in range(len(bins)):
-        for j in range(len(bins[i])):
-            bins2 = createBins(med[i][j], bins[i][j]._vertices, bins[i][j]._bbox)
-            for k in range(len(bins2)):
-                for l in range(len(bins2)):
-                    solve(bins2[i][j]._vertices)
-    d.writeDEF('sample/sample_iter2.def')
-    '''
+    bins = [createBins(V, bbox)]
 
+    for niter in range(1, 5):
+        print(f'solving : level {niter}')
+        binstmp = []
+        for i in range(len(bins)):
+            for j in range(len(bins[i])):
+                for k in range(len(bins[i][j])):
+                    solve(bins[i][j][k]._vertices)
+                    binstmp.append(createBins(bins[i][j][k]._vertices, bins[i][j][k]._bbox))
+        d.writeDEF(f'{outfile}_iter{niter}.def')
+        bins = binstmp
+
+# load the DEF file and build the connectivity graph using the Vertex class
+# Boundary pins have the name PIN followed by the pinName
 def place(deffile, outfile):
     d = LEFDEFParser.DEFReader()
     d.readDEF(deffile)
