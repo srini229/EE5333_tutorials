@@ -162,13 +162,14 @@ def createBins(Vertices, bbox):
     return bins
 
 # Iteratively quadrisection and solve
-def solveIter(V, bbox, outfile, d):
+def solveIter(V, bbox, outfile, d, Numiter):
     print(f'solving : level 0')
     solve(V)
+    savedSol = [(np.array([v._comp.location().x for v in V]), np.array([v._comp.location().y for v in V]))]
     d.writeDEF(f'{outfile}_iter0.def')
     bins = [createBins(V, bbox)]
 
-    for niter in range(1, 5):
+    for niter in range(1, Numiter):
         print(f'solving : level {niter}')
         binstmp = []
         for i in range(len(bins)):
@@ -176,12 +177,14 @@ def solveIter(V, bbox, outfile, d):
                 for k in range(len(bins[i][j])):
                     solve(bins[i][j][k]._vertices)
                     binstmp.append(createBins(bins[i][j][k]._vertices, bins[i][j][k]._bbox))
+        savedSol.append((np.array([v._comp.location().x for v in V]),np.array([v._comp.location().y for v in V])))
         d.writeDEF(f'{outfile}_iter{niter}.def')
         bins = binstmp
+    return savedSol
 
 # load the DEF file and build the connectivity graph using the Vertex class
 # Boundary pins have the name PIN followed by the pinName
-def place(deffile, outfile):
+def place(deffile, outfile, Numiter):
     d = LEFDEFParser.DEFReader()
     d.readDEF(deffile)
     chip_bbox = d.bbox()
@@ -210,6 +213,31 @@ def place(deffile, outfile):
                 V[u[i]]._nbrs.append(V[u[j]])
                 V[u[j]]._nbrs.append(V[u[i]])
     
-    solveIter(V, ((chip_bbox.ll.x, chip_bbox.ll.y),(chip_bbox.ur.x, chip_bbox.ur.y)), outfile, d)
+    bb = ((chip_bbox.ll.x, chip_bbox.ll.y),(chip_bbox.ur.x, chip_bbox.ur.y))
+    plot(solveIter(V, bb, outfile, d, Numiter), bb)
 
-place('sample/sample.def', 'sample/sample_')
+def plot(sol, bb):
+    import matplotlib.pyplot as plt
+    from matplotlib.widgets import Button, Slider
+
+    fig, ax = plt.subplots()
+    ax.plot(sol[0][0], sol[0][1], 'o')
+    ax.set_xlim([bb[0][0], bb[1][0]])
+    ax.set_ylim([bb[0][1], bb[1][1]])
+    fig.subplots_adjust(bottom=0.25)
+
+    iterax = fig.add_axes([0.25, 0.1, 0.65, 0.03])
+    iter_slider = Slider(ax=iterax, label='Iter', valmin=0, valmax=(len(sol)-1), valstep=1, valinit=0)
+
+    def update(val):
+        ax.clear()
+        ax.plot(sol[val][0], sol[val][1], 'o')
+        ax.set_xlim([bb[0][0], bb[1][0]])
+        ax.set_ylim([bb[0][1], bb[1][1]])
+        fig.canvas.draw_idle()
+
+    iter_slider.on_changed(update)
+
+    plt.show()
+
+place('sample/sample.def', 'sample/sample_', 5)
