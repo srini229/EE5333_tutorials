@@ -75,7 +75,7 @@ class Bin:
                       LEFDEFParser.Point(int(bb[0][0]),      int(bb[1][1]))       #7 North West pin
                       ]
 
-    def rebuild(self):
+    def build(self):
         for i in range(len(self._vertices)):
             self._vertices[i]._index = i
             totalNbrs = len(self._vertices[i]._pinNbrs) + len(self._vertices[i]._nbrs)
@@ -158,7 +158,7 @@ def createBins(Vertices, bbox):
                 v._bin = bins[xi][yi]
     for i in range(len(bins)):
         for j in range(len(bins[i])):
-            bins[i][j].rebuild()
+            bins[i][j].build()
     return bins
 
 # Iteratively quadrisection and solve
