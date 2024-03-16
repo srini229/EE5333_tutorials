@@ -39,8 +39,8 @@ def solve(Vertices):
     for i in range(len(Vertices)):
         Vertices[i]._comp.setLocation(0, 0)
     A = np.zeros((len(Vertices), len(Vertices)))
-    bx = np.zeros((len(Vertices), 1))
-    by = np.zeros((len(Vertices), 1))
+    bx = np.zeros(len(Vertices))
+    by = np.zeros(len(Vertices))
     for i in range(len(Vertices)):
         A[i][i] += (len(Vertices[i]._nbrs) + len(Vertices[i]._pinNbrs))*1.
         for nbr in Vertices[i]._nbrs:
