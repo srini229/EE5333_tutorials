@@ -240,4 +240,5 @@ def plot(sol, bb):
 
     plt.show()
 
-place('sample/sample.def', 'sample/sample_', 5)
+#place('sample/sample.def', 'sample/sample_', 5)
+place('sample/dma.def', 'sample/dma_', 4)
