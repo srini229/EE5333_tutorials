@@ -75,6 +75,7 @@ class Bin:
                       LEFDEFParser.Point(int(bb[0][0]),      int(bb[1][1]))       #7 North West pin
                       ]
 
+    # replace connections to neighbours that do not belong to this tile with virtual pin connections at appropriate boundaries
     def build(self):
         for i in range(len(self._vertices)):
             self._vertices[i]._index = i
@@ -184,7 +185,7 @@ def solveIter(V, bbox, outfile, d, Numiter):
 
 # load the DEF file and build the connectivity graph using the Vertex class
 # Boundary pins have the name PIN followed by the pinName
-def place(deffile, outfile, Numiter):
+def place(deffile, outfile, Numiter=4):
     d = LEFDEFParser.DEFReader()
     d.readDEF(deffile)
     chip_bbox = d.bbox()
@@ -215,7 +216,10 @@ def place(deffile, outfile, Numiter):
     
     bb = ((chip_bbox.ll.x, chip_bbox.ll.y),(chip_bbox.ur.x, chip_bbox.ur.y))
     plot(solveIter(V, bb, outfile, d, Numiter), bb)
+    d.writeDEF(outfile)
 
+# Visualize the placement using a slider for the iteration
+# Move the slide to see the cell migration
 def plot(sol, bb):
     import matplotlib.pyplot as plt
     from matplotlib.widgets import Button, Slider
@@ -241,4 +245,4 @@ def plot(sol, bb):
     plt.show()
 
 #place('sample/sample.def', 'sample/sample_', 5)
-place('sample/dma.def', 'sample/dma_', 4)
+place('sample/dma.def', 'sample/dma_out.def')
