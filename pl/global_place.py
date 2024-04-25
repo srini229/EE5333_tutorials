@@ -24,12 +24,13 @@ def solveUsingCG(A, b, eps = 1e-4):
 
 # Class to hold neighbours and pins connected to each standard cell
 class Vertex:
-    def __init__(self, c):
+    def __init__(self, c, dim):
         self._comp = c
         self._nbrs = []
         self._pinNbrs = []
         self._bin = None
         self._index = -1
+        self._dim = dim
         
     def __repr__(self):
         return self._comp.name() + f' {self._nbrs} {self._pinNbrs}'
@@ -52,7 +53,7 @@ def solve(Vertices):
     t = time.time()
     solx = solveUsingCG(A, bx)
     soly = solveUsingCG(A, by)
-    print('runtime :', time.time() - t)
+    # print('runtime :', time.time() - t)
     for i in range(len(Vertices)):
         Vertices[i]._comp.setLocation(int(solx[i]), int(soly[i]))
 
@@ -183,13 +184,54 @@ def solveIter(V, bbox, outfile, d, Numiter):
         bins = binstmp
     return savedSol
 
+# Calculate overlap between two cells
+def overlap(p1, p2):
+    xd = max(min(p1[2] - p2[0], p2[2] - p1[0]), 0)
+    yd = max(min(p1[3] - p2[1], p2[3] - p1[1]), 0)
+    return xd * yd * 1.e-6
+
+def overlapCost(V):
+    overlapArea = 0.
+    P = [(v._comp.location().x, v._comp.location().y, v._comp.location().x + v._dim[0], v._comp.location().y + v._dim[1]) for v in V]
+    for i in range(len(P)):
+        for j in range(i + 1, len(P)):
+            overlapArea += overlap(P[i], P[j])
+    return overlapArea
+
+def hpwlCost(nets, Vdict, Pdict, V):
+    hpwl = 0.
+    for n in nets:
+        minx, miny = 1.e20, 1.e20
+        maxx, maxy = -1.e20, -1.e20
+        for p in n.pins():
+            if p[0] != 'PIN':
+                assert(p[0] in Vdict)
+                v = V[Vdict[p[0]]]
+                pos = (v._comp.location().x + v._dim[0]//2, v._comp.location().y + v._dim[1])
+            else:
+                assert(p[1] in Pdict)
+                pos = (Pdict[p[1]].x, Pdict[p[1]].y)
+            minx = min(minx, pos[0])
+            maxx = max(maxx, pos[0])
+            miny = min(miny, pos[1])
+            maxy = max(maxy, pos[1])
+        hpwl += ((maxx - minx) + (maxy - miny)) * 1.e-3
+    return hpwl
+
 # load the DEF file and build the connectivity graph using the Vertex class
 # Boundary pins have the name PIN followed by the pinName
-def place(deffile, outfile, Numiter=4):
+def place(deffile, leffile, outfile, Numiter=4):
+    # load LEF file for cell dimensions
+    l = LEFDEFParser.LEFReader()
+    dimLookup = dict()
+    if leffile:
+      l.readLEF(leffile)
+      dimLookup = {m.name():(m.xdim(), m.ydim()) for m in l.macros()}
+
     d = LEFDEFParser.DEFReader()
     d.readDEF(deffile)
     chip_bbox = d.bbox()
-    V = [Vertex(c) for c in d.components()]
+    V = [Vertex(c, dimLookup[c.macro()]) for c in d.components()]
     for i in range(len(V)):
         V[i]._index = i
     Vdict = {V[i]._comp.name():i for i in range(len(V))}
@@ -217,6 +259,9 @@ def place(deffile, outfile, Numiter=4):
     bb = ((chip_bbox.ll.x, chip_bbox.ll.y),(chip_bbox.ur.x, chip_bbox.ur.y))
     plot(solveIter(V, bb, outfile, d, Numiter), bb)
     d.writeDEF(outfile)
+    oCost = overlapCost(V)
+    hCost = hpwlCost(d.nets(), Vdict, Pdict, V)
+    print("overlap cost :", oCost, " hpwlCost :", hCost, "total cost :", 0.1 * oCost + hCost)
 
 # Visualize the placement using a slider for the iteration
 # Move the slide to see the cell migration
@@ -245,4 +290,4 @@ def plot(sol, bb):
     plt.show()
 
 #place('sample/sample.def', 'sample/sample_', 5)
-place('sample/dma.def', 'sample/dma_out.def')
+place('sample/dma.def', 'sample/dma.lef', 'sample/dma_out.def')
