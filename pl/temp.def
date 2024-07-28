@@ -1,0 +1,25 @@
+VERSION  5.4 ;
+NAMESCASESENSITIVE ON ;
+DIVIDERCHAR "/" ;
+BUSBITCHARS  "[]" ;
+DESIGN dma_top ;
+UNITS DISTANCE MICRONS 1000 ;
+
+DIEAREA ( 0 0 ) ( 24000 24000 ) ;
+
+COMPONENTS 5 ;
+- U1 MAS22  + PLACED ( 0 0 ) N ;
+- U2 MAS77  + PLACED ( 0 4500 ) N ;
+- U3 MAS77  + PLACED ( 0 9000 ) N ;
+- U4 MAS77  + PLACED ( 0 13500 ) N ;
+- U5 MAS77  + PLACED ( 0 18000 ) N ;
+END COMPONENTS
+
+NETS 4 ;
+- net1 ( U2 Y ) ( U1 A ) ;
+- net2 ( U3 Y ) ( U1 B ) ;
+- net3 ( U4 Y ) ( U1 C ) ;
+- net4 ( U5 Y ) ( U1 D ) ;
+END NETS
+
+END DESIGN

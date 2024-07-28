@@ -1,0 +1,534 @@
+{
+  "nbformat": 4,
+  "nbformat_minor": 0,
+  "metadata": {
+    "colab": {
+      "provenance": [],
+      "collapsed_sections": [
+        "E_y7XnepWtrc"
+<<<<<<< HEAD
+      ]
+=======
+      ],
+      "include_colab_link": true
+>>>>>>> refs/remotes/origin/master
+    },
+    "kernelspec": {
+      "name": "python3",
+      "display_name": "Python 3"
+    },
+    "language_info": {
+      "name": "python"
+    }
+  },
+  "cells": [
+    {
+      "cell_type": "code",
+      "source": [
+        "# Install the mip package inside the colab environment\n",
+        "%pip install mip"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "TUJPEQax7d1D",
+        "outputId": "ba221f69-356d-40a2-d7a0-dd7ba8bcdfd3"
+      },
+      "execution_count": null,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Requirement already satisfied: mip in /usr/local/lib/python3.10/dist-packages (1.15.0)\n",
+            "Requirement already satisfied: cffi==1.15.* in /usr/local/lib/python3.10/dist-packages (from mip) (1.15.1)\n",
+            "Requirement already satisfied: pycparser in /usr/local/lib/python3.10/dist-packages (from cffi==1.15.*->mip) (2.21)\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Install the mip package inside the colab environment\n",
+        "%pip install mip"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 354
+        },
+        "id": "TUJPEQax7d1D",
+        "outputId": "9c6c77b8-f23b-4dcb-9137-fde33cb06280"
+      },
+      "execution_count": 2,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Collecting mip\n",
+            "  Downloading mip-1.15.0-py3-none-any.whl (15.3 MB)\n",
+            "\u001b[2K     \u001b[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m \u001b[32m15.3/15.3 MB\u001b[0m \u001b[31m37.8 MB/s\u001b[0m eta \u001b[36m0:00:00\u001b[0m\n",
+            "\u001b[?25hCollecting cffi==1.15.* (from mip)\n",
+            "  Downloading cffi-1.15.1-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (441 kB)\n",
+            "\u001b[2K     \u001b[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m \u001b[32m441.8/441.8 kB\u001b[0m \u001b[31m15.5 MB/s\u001b[0m eta \u001b[36m0:00:00\u001b[0m\n",
+            "\u001b[?25hRequirement already satisfied: pycparser in /usr/local/lib/python3.10/dist-packages (from cffi==1.15.*->mip) (2.21)\n",
+            "Installing collected packages: cffi, mip\n",
+            "  Attempting uninstall: cffi\n",
+            "    Found existing installation: cffi 1.16.0\n",
+            "    Uninstalling cffi-1.16.0:\n",
+            "      Successfully uninstalled cffi-1.16.0\n",
+            "Successfully installed cffi-1.15.1 mip-1.15.0\n"
+          ]
+        },
+        {
+          "output_type": "display_data",
+          "data": {
+            "application/vnd.colab-display-data+json": {
+              "pip_warning": {
+                "packages": [
+                  "cffi"
+                ]
+              }
+            }
+          },
+          "metadata": {}
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "# <ins>**Set cover problem**</ins>\n",
+        "\n",
+        "## Problem definition:\n",
+        "<ul>\n",
+        "$\\mathcal{U}$ : Universe = set of elements, $\\{0,1,2,\\ldots,N-1\\}$\n",
+        "\n",
+        "$\\mathcal{S}$ : collection of subsets of $\\mathcal{U}$\n",
+        "\n",
+        "$\\mathcal{C}$ : set cover is a subset of $\\mathcal{S}$ with smallest cardinality whose union is $\\mathcal{U}$\n",
+        "</ul>\n",
+        "\n",
+        "## Example:\n",
+        "<ul>\n",
+        "$\\mathcal{U}=\\{0,1,2,3,4\\},~\\mathcal{S}=\\{\\{0,1\\},\\{1,2,3\\},\\{3,4\\},\\{0,1,4\\}\\}$\n",
+        "\n",
+        "$\\mathcal{C}=\\{\\{1,2,3\\},\\{0,1,4\\}\\}$\n",
+        "</ul>"
+      ],
+      "metadata": {
+        "id": "XCytbYEc3vm7"
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "## ILP formulation\n",
+        "* $x_s$ is an indicator variable for $s\\in \\mathcal{S}$ being in $\\mathcal{C}$; $\\small x_s = \\begin{cases}0,& i \\notin \\mathcal{C}\\\\1,& i \\in \\mathcal{C}\t\\end{cases}$\n",
+        "\n",
+        "* Objective:\n",
+        "  $\\min\\limits_{x_s} \\sum\\limits_{s\\in \\mathcal{S}}x_s$\n",
+        "\n",
+        "* Subject to constraints:\n",
+        "\n",
+        "  $\\begin{align} \\sum\\limits_{s:i\\in s}x_s &\\geq 1,&\\forall i \\in \\mathcal{U}\\\\\n",
+        "x_s &\\in \\{0,1\\}, &\\forall s \\in \\mathcal{S}\n",
+        "\\end{align}$\n",
+        "\n",
+        "\n",
+        "\n"
+      ],
+      "metadata": {
+        "id": "zrViEx0G4dAJ"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+<<<<<<< HEAD
+        "from numbers import Real\n",
+=======
+>>>>>>> refs/remotes/origin/master
+        "# N : number of vertices; vertices in {0,1,...(N-1)}\n",
+        "# S : list of tuples\n",
+        "# Return value : set cover as a list of tuples\n",
+        "\n",
+        "def findSetCover(N, S):\n",
+        "    import mip\n",
+        "    model = mip.Model(\"SetCover\")\n",
+        "    model.verbose = 0 # turn off Cbc console logs\n",
+        "    x = [model.add_var(var_type=mip.BINARY,\\\n",
+        "        name=f\"x_{s}\") for s in range(len(S))]\n",
+        "    model.objective = mip.minimize(mip.xsum(x))\n",
+        "    occ = [[] for _ in range(N)]\n",
+        "    for i in range(len(S)):\n",
+        "      for j in S[i]: # store the set indices to which i belongs\n",
+        "        occ[j].append(i)\n",
+        "    for xi in occ:\n",
+        "      model += mip.xsum(x[i] for i in xi) >= 1\n",
+        "    model.optimize()\n",
+        "    model.write('set_cover.lp')\n",
+        "    if model.status == mip.OptimizationStatus.OPTIMAL:\n",
+        "        return [S[i] for i in range(len(S)) if x[i].x > 0.9]\n",
+        "    return []\n"
+      ],
+      "metadata": {
+        "id": "klffLF8Y7W6C"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "print(findSetCover(5, [(0,1), (1,2,3), (3,4), (0,1,4)]))"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "X1KpuT1M7bW9",
+        "outputId": "6cfa15d5-76ff-46bc-a8e5-2f69f9776d18"
+      },
+      "execution_count": null,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "[(1, 2, 3), (0, 1, 4)]\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "!cat set_cover.lp"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "GExE3tiY9Emr",
+        "outputId": "a583d34f-c1a6-4afc-eac2-c65149fbc737"
+      },
+      "execution_count": null,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "\\Problem name: SetCover\n",
+            "\n",
+            "Minimize\n",
+            "OBJROW: x_0 + x_1 + x_2 + x_3\n",
+            "Subject To\n",
+            "constr(0):  x_0 + x_3 >= 1\n",
+            "constr(1):  x_0 + x_1 + x_3 >= 1\n",
+            "constr(2):  x_1 >= 1\n",
+            "constr(3):  x_1 + x_2 >= 1\n",
+            "constr(4):  x_2 + x_3 >= 1\n",
+            "Bounds\n",
+            " 0 <= x_0 <= 1\n",
+            " 0 <= x_1 <= 1\n",
+            " 0 <= x_2 <= 1\n",
+            " 0 <= x_3 <= 1\n",
+            "Integers\n",
+            "x_0 x_1 x_2 x_3 \n",
+            "End\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "# <ins> **Minimum vertex cover problem** </ins>\n",
+        "\n",
+        "* Vertex cover($V'$) : set of vertices that has one end point of every edge\n",
+        "  + $G=(V,E)$\n",
+        "  + $V' \\subseteq V:~u \\in V' \\lor v\\in V',~\\forall (u,v)\\in E$\n",
+        "#### e.g. :\n",
+        "  <img src=\"https://raw.githubusercontent.com/srini229/EE5333_tutorials/master/intro/fig/vertex_cover.jpg\" width=118 height=139 />\n",
+        "\n",
+        "    $V'= \\left\\lbrace 0,2,3,4\\right\\rbrace$, $\\lbrace 1,2,4\\rbrace$, $\\lbrace 1,2,5\\rbrace$\n",
+        "\n",
+        "\n",
+        "\n",
+        "\n",
+        "* Minimum vertex cover : minimum valued/sized vertex cover\n",
+        "\n",
+        "    e.g. $\\lbrace 1,2,4\\rbrace$, $\\lbrace 1,2,5\\rbrace$ </ul>\n"
+      ],
+      "metadata": {
+        "id": "JV_G_3AyBT5l"
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "## ILP formulation :\n",
+        "\n",
+        "* $x_v$ is the indicator variable for $v$ being in $V'$; $\\small                x_v = \\begin{cases} 0,& v\\notin V'\\\\1,& v\\in V'\\end{cases}$\n",
+        "* Objective: $\\min\\limits_{x_v} {\\sum\\limits_{v\\in V} x_v}$\n",
+        "* Subject to constraints:\n",
+        "<ul>\n",
+        "$\\begin{align}\n",
+        "x_u + x_v &\\geq 1,&\\forall (u,v)\\in E \\\\x_v &\\in \\{0,1\\},&\\forall v\\in V\n",
+        "\\end{align}$\n",
+        "</ul>"
+      ],
+      "metadata": {
+        "id": "O29aLzCrCJGr"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# N : number of vertices; vertices in {0,1,...(N-1)}\n",
+        "# E : list of edges; edge = unordered pair of vertices\n",
+        "# Return value : minimum vertex cover as list\n",
+        "def findMinVertexCover(N, E):\n",
+        "    import mip\n",
+        "    model = mip.Model(\"VertexCover\")\n",
+        "    model.verbose = 0 # turn off Cbc console logs\n",
+        "    x = [model.add_var(var_type=mip.BINARY,\\\n",
+        "        name=f\"x_{i}\") for i in range(N)]\n",
+        "    model.objective = mip.minimize(mip.xsum(x))\n",
+        "    for e in E:\n",
+        "        model += (x[e[0]] + x[e[1]] >= 1)\n",
+        "    model.optimize()\n",
+        "    model.write(\"vertex_cover.lp\")\n",
+        "    if model.status == mip.OptimizationStatus.OPTIMAL:\n",
+        "        return [i for i in range(N) if x[i].x >= 0.9]\n",
+        "    return []"
+      ],
+      "metadata": {
+        "id": "C4lOsJFFBiDm"
+      },
+      "execution_count": 1,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "print(findMinVertexCover(4,[(0,1),(0,2),(1,2),(1,3)]))\n",
+        "print(findMinVertexCover(6,[(0,1),(1,2),(1,3),(1,4),(2,3),(2,5),(4,5)]))"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "fgpwXWcELtP2",
+        "outputId": "3c075403-5f37-4709-b305-2ec49a136d8e"
+      },
+      "execution_count": 2,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "[0, 1]\n",
+            "[1, 2, 5]\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "!cat vertex_cover.lp"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "o2qDnizaLy7-",
+        "outputId": "8ce36bbc-1251-4669-94c8-7babc209b210"
+      },
+      "execution_count": null,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "\\Problem name: VertexCover\n",
+            "\n",
+            "Minimize\n",
+            "OBJROW: x_0 + x_1 + x_2 + x_3 + x_4 + x_5\n",
+            "Subject To\n",
+            "constr(0):  x_0 + x_1 >= 1\n",
+            "constr(1):  x_1 + x_2 >= 1\n",
+            "constr(2):  x_1 + x_3 >= 1\n",
+            "constr(3):  x_1 + x_4 >= 1\n",
+            "constr(4):  x_2 + x_3 >= 1\n",
+            "constr(5):  x_2 + x_5 >= 1\n",
+            "constr(6):  x_4 + x_5 >= 1\n",
+            "Bounds\n",
+            " 0 <= x_0 <= 1\n",
+            " 0 <= x_1 <= 1\n",
+            " 0 <= x_2 <= 1\n",
+            " 0 <= x_3 <= 1\n",
+            " 0 <= x_4 <= 1\n",
+            " 0 <= x_5 <= 1\n",
+            "Integers\n",
+            "x_0 x_1 x_2 x_3 x_4 x_5 \n",
+            "End\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "# <ins> **Graph coloring** </ins>\n",
+        "\n",
+        "* Given a graph $G=(V,E)$ and $C$ colors, color each vertex in graph such that no two same color vertices are adjacent\n",
+        "##### e.g. three coloring\n",
+        "<img src=https://raw.githubusercontent.com/srini229/EE5333_tutorials/master/intro/fig/color_graph.jpg width=118 height=139 />\n",
+        "\n",
+        "* Weighted coloring : each color $c_i$ has a cost $w_i$; Reduce the overall cost.\n"
+      ],
+<<<<<<< HEAD
+      "metadata": {
+        "id": "E_y7XnepWtrc"
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "## ILP formulation\n",
+        "\n",
+        "* $x_{v,i}$ is the indicator variable for vertex $v$ being colored $i$, $\\small x_{v,i} = \\begin{cases}0,& v~\\text{is not } i~\\text{colored} \\\\1,& v~\\text{is } i~\\text{colored}\\end{cases}$\n",
+        "* Objective: $\\min\\limits_{x_{v,i}} \\sum\\limits_{v\\in V}\\sum\\limits_{i=0}^{C-1}w_i\\cdot x_{v,i}$\n",
+        "* Subject to constraints:\n",
+        "\n",
+        "  $\\begin{align}\n",
+        "  \\sum_{i=0}^{C-1} x_{v,i}&= 1, &\\forall v \\in V\\\\\n",
+        "  x_{u, i} + x_{v,i} &\\leq 1, &\\forall i \\in \\{0,1,\\ldots,C-1\\}, (u,v) \\in E\\\\\n",
+        "  x_{v,i} &\\in\\{0,1\\},&\\forall i \\in \\{0,1,\\ldots,C-1\\}, v\\in V\n",
+        "  \\end{align}$"
+      ],
+      "metadata": {
+        "id": "vsHV1Gm9be5D"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# N is num. vertices; vertices are indexed {0,1,...,(N-1)}\n",
+        "# E is a list of edges; each edge is an unordered pair of vertices\n",
+        "# C is list of color costs : C[i] is the cost of color i\n",
+        "#                            color ranges from [0,1,...,len(C)-1]\n",
+        "# Return value : list of colors if colorable empty list otherwise;\n",
+        "#                ith color in the list is for the ith vertex\n",
+        "def colorGraph(N, E, C):\n",
+        "  return None"
+      ],
+      "metadata": {
+        "id": "n6XAaYVEdUFN"
+=======
+      "metadata": {
+        "id": "E_y7XnepWtrc"
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "## ILP formulation\n",
+        "\n",
+        "* $x_{v,i}$ is the indicator variable for vertex $v$ being colored $i$, $\\small x_{v,i} = \\begin{cases}0,& v~\\text{is not } i~\\text{colored} \\\\1,& v~\\text{is } i~\\text{colored}\\end{cases}$\n",
+        "* Objective: $\\min\\limits_{x_{v,i}} \\sum\\limits_{v\\in V}\\sum\\limits_{i=0}^{C-1}w_i\\cdot x_{v,i}$\n",
+        "* Subject to constraints:\n",
+        "\n",
+        "  $\\begin{align}\n",
+        "  \\sum_{i=0}^{C-1} x_{v,i}&= 1, &\\forall v \\in V\\\\\n",
+        "  x_{u, i} + x_{v,i} &\\leq 1, &\\forall i \\in \\{0,1,\\ldots,C-1\\}, (u,v) \\in E\\\\\n",
+        "  x_{v,i} &\\in\\{0,1\\},&\\forall i \\in \\{0,1,\\ldots,C-1\\}, v\\in V\n",
+        "  \\end{align}$"
+      ],
+      "metadata": {
+        "id": "vsHV1Gm9be5D"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# N is num. vertices; vertices are indexed {0,1,...,(N-1)}\n",
+        "# E is a list of edges; each edge is an unordered pair of vertices\n",
+        "# C is list of color costs : C[i] is the cost of color i\n",
+        "#                            color ranges from [0,1,...,len(C)-1]\n",
+        "# Return value : list of colors if colorable empty list otherwise;\n",
+        "#                ith color in the list is for the ith vertex\n",
+        "def colorGraph(N, E, C):\n",
+        "  return []"
+      ],
+      "metadata": {
+        "id": "n6XAaYVEdUFN"
+      },
+      "execution_count": 24,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "print(colorGraph(6, [(0,1), (1,2), (1,3), (1,4), (2,3), (2,5), (1,4), (4,5)], [1,2,1]))\n",
+        "# one potential solution is  [0,2,0,1,0,2]"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "gi-e0F9NdWaR",
+        "outputId": "3484e708-b7b1-4f83-b01c-d4b8ee3e48fc"
+      },
+      "execution_count": 27,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "[0, 2, 0, 1, 0, 2]\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [],
+      "metadata": {
+        "id": "M5tUtqHw-9Cg"
+>>>>>>> refs/remotes/origin/master
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "print(colorGraph(6, [(0,1), (1,2), (1,3), (1,4), (2,3), (2,5), (1,4), (4,5)], [1,2,1]))"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "gi-e0F9NdWaR",
+        "outputId": "f74fc971-8c43-4064-e4f0-aadc19644fa7"
+      },
+      "execution_count": null,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "None\n"
+          ]
+        }
+      ]
+    }
+  ]
+}
