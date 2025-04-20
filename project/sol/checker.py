@@ -90,7 +90,7 @@ def plotInsts(insts, pins):
       for r in rects:
         xmin, ymin = min(xmin, r.ll.x), min(ymin, r.ll.y)
         xmax, ymax = max(xmax, r.ur.x), max(ymax, r.ur.y)
-  
+
   fig = plt.figure()
   plt.xlim(xmin, xmax)
   plt.ylim(ymin, ymax)
@@ -140,7 +140,7 @@ def plotInsts(insts, pins):
 
   for k, v in patchByLayer.items():
     if k != 'pin labels': ca.add_collection(v)
-  
+
   rax = plt.axes([0.9, 0.4, 0.1, 0.15])
   check = CheckButtons(ax=rax, labels=patchByLayer.keys(), label_props={'color': colors},
       actives=[True for layer in patchByLayer.keys()],
@@ -160,7 +160,7 @@ def plotInsts(insts, pins):
 
   plt.show()
 
-  
+
 #for inst in insts:
 #  print(inst._comp.name(), inst._comp.location(), inst._macro.name())
 
@@ -223,7 +223,7 @@ def addNeighbours(G, r, layer, nid, layerTrees):
       curr = nbr.id
       break
   G.add_node(curr)
-            
+
 # add current layer neighbours
   for nbr in nbrs:
     if nid == nbr.object and curr != nbr.id:
@@ -272,6 +272,49 @@ def check(nets, insts):
   print(f"Total number of nets : {len(nets)}")
   print(f"Total number of open nets : {nOpens}")
 
+
+def loadAndCheck(odef, idef, lef, plot):
+  leff = LEFDEFParser.LEFReader()
+  ideff = LEFDEFParser.DEFReader()
+  odeff = LEFDEFParser.DEFReader()
+  leff.readLEF(lef)
+  lefDict = {m.name() : m for m in leff.macros()}
+  ideff.readDEF(idef)
+  odeff.readDEF(odef)
+
+  for layer in leff.layers():
+    layerWidth[layer.name()] = layer.width()
+    layerSpacing[layer.name()] = layer.pitch() - layer.width()
+
+  insts = {inst.name():Inst(inst, lefDict[inst.macro()]) for inst in ideff.components() if inst.macro() not in skipCells}
+
+  pins = dict()
+  for p in ideff.pins():
+    pn = p.name()
+    pins[pn] = dict()
+    for port in p.ports():
+      for layer, rects in port.items():
+        if layer not in pins[pn]: pins[pn][layer] = list()
+        for r in rects:
+          pins[pn][layer].append(Rect(r.ll.x, r.ll.y, r.ur.x, r.ur.y))
+
+  nets = list()
+  idx = 0
+  for net in ideff.nets():
+    if net.name() not in skipNets:
+      nets.append(Net(net, insts, pins, idx))
+      idx += 1
+
+  netDict = dict()
+  for net in nets:
+    netDict[net._name] = net
+  for net in odeff.nets():
+    if net.name() in netDict:
+      netDict[net.name()]._sol = net.rects()
+
+  if (plot): plotInsts(insts, pins)
+  check(nets, insts)
+
 if __name__ == '__main__':
   import argparse
 
@@ -281,45 +324,5 @@ if __name__ == '__main__':
   ap.add_argument("-i", "--ideff", type=str, default="", help='<input def file>')
   ap.add_argument("-p", "--plot", action='store_true')
   args = ap.parse_args()
-  leff = LEFDEFParser.LEFReader()
-  ideff = LEFDEFParser.DEFReader()
-  odeff = LEFDEFParser.DEFReader()
   if args.leff != "" and args.ideff != "" and args.odeff != "":
-    leff.readLEF(args.leff)
-    lefDict = {m.name() : m for m in leff.macros()}
-    ideff.readDEF(args.ideff)
-    odeff.readDEF(args.odeff)
-
-    for layer in leff.layers():
-      layerWidth[layer.name()] = layer.width()
-      layerSpacing[layer.name()] = layer.pitch() - layer.width()
-
-    insts = {inst.name():Inst(inst, lefDict[inst.macro()]) for inst in ideff.components() if inst.macro() not in skipCells}
-    
-    pins = dict()
-    for p in ideff.pins():
-      pn = p.name()
-      pins[pn] = dict()
-      for port in p.ports():
-        for layer, rects in port.items():
-          if layer not in pins[pn]: pins[pn][layer] = list()
-          for r in rects:
-            pins[pn][layer].append(Rect(r.ll.x, r.ll.y, r.ur.x, r.ur.y))
-
-    nets = list()
-    idx = 0
-    for net in ideff.nets():
-      if net.name() not in skipNets:
-        nets.append(Net(net, insts, pins, idx))
-        idx += 1
-
-    netDict = dict()
-    for net in nets:
-      netDict[net._name] = net
-    for net in odeff.nets():
-      if net.name() in netDict:
-        netDict[net.name()]._sol = net.rects()
-
-    if (args.plot): plotInsts(insts, pins)
-    check(nets, insts)
-    
+    loadAndCheck(args.odeff, args.ideff, args.leff, args.plot)
