@@ -2,6 +2,7 @@
 import LEFDEFParser
 from LEFDEFParser import Rect
 
+# skip decap, fill and tap cells
 skipCells = {"sky130_fd_sc_hd__decap_3", "sky130_fd_sc_hd__decap_4", "sky130_fd_sc_hd__decap_6", "sky130_fd_sc_hd__decap_8",\
             "sky130_fd_sc_hd__decap_12", "sky130_fd_sc_hd__fill_1", "sky130_fd_sc_hd__fill_2", "sky130_fd_sc_hd__fill_4",
             "sky130_fd_sc_hd__fill_8", "sky130_fd_sc_hd__lpflow_decapkapwr_3", "sky130_fd_sc_hd__lpflow_decapkapwr_4",\
@@ -14,6 +15,7 @@ skipCells = {"sky130_fd_sc_hd__decap_3", "sky130_fd_sc_hd__decap_4", "sky130_fd_
 
 layerColors = { 'li1': 'red', 'met1': 'blue', 'met2': 'green', 'met3': 'orange', 'met4': 'magenta', 'met5': 'cyan' }
 
+# skip power/ground/clock nets
 skipNets = {'clk', 'VPWR', 'VGND'}
 
 adjLayer = {
@@ -28,6 +30,7 @@ adjLayer = {
 layerWidth = dict()
 layerSpacing = dict()
 
+# instance from the component list that is transformed using the orientation and origin
 class Inst:
   def __init__(self, comp, macro):
     self._comp = comp
@@ -57,19 +60,21 @@ class Inst:
         self._obsts[layer].append(r)
 
 
+# wrapper Net class that has the actual pins and solutions at the transformed coordinates
 class Net:
   def __init__(self, net, insts, pins, idx):
     self._name = net.name()
     self._pins = dict()
-    self._id   = idx
-    self._sol  = net.rects()
+    self._id   = idx # unique ID used to identify nets from rtree
+    self._sol  = net.rects() # solution shapes read from the output def file
     for p in net.pins():
       if p[0] in insts:
-        self._pins[p] = insts[p[0]]._pins[p[1]]
+        self._pins[p] = insts[p[0]]._pins[p[1]] # copy shapes from the transformed instance pins
       elif p[0] == 'PIN' and p[1] in pins:
-        self._pins[p] = pins[p[1]]
+        self._pins[p] = pins[p[1]] # copy shapes from the boundary pins
 
 
+# interactive plotting util to view pins/obstacles/boundaries
 def plotInsts(insts, pins):
   from matplotlib.patches import Rectangle
   from matplotlib.collections import PatchCollection
@@ -209,7 +214,8 @@ def checkSpacing(layerTrees, nets, insts):
   return numViolations
 
 
-def addNeighbours(G, r, layer, nid, layerTrees):
+# add neighbours : ea
+def addNeighbours(G, r, layer, nid, layerTrees): 
 # find count of current rect
   nbrs = list(layerTrees[layer].intersection((r.ll.x - 1, r.ll.y - 1, r.ur.x + 1, r.ur.y + 1), objects=True))
   for nbr in nbrs:
@@ -232,6 +238,10 @@ def addNeighbours(G, r, layer, nid, layerTrees):
         G.add_node(nbr.id)
         G.add_edge(curr, nbr.id)
 
+
+# each shape of a net (pin/solutions) form a vertex in an undirected graph.
+# any two overlapping shapes in same/adjacent layer are connected by contact or by an implicit via
+# build such a graph and see if it forms a single connected component to see if the net is completely connected
 def checkConnectivity(layerTrees, nets, insts):
   import networkx as nx
   numOpens = 0
@@ -252,6 +262,7 @@ def checkConnectivity(layerTrees, nets, insts):
 
   return numOpens
 
+# check for spacing and connectivity violations
 def check(nets, insts):
   layerTrees = buildTree(nets, insts)
   nViols = checkSpacing(layerTrees, nets, insts)
