@@ -14,6 +14,7 @@ skipCells = {"sky130_fd_sc_hd__decap_3", "sky130_fd_sc_hd__decap_4", "sky130_fd_
             "sky130_fd_sc_hd__tapvpwrvgnd_1", "sky130_ef_sc_hd__decap_12"}
 
 layerColors = { 'li1': 'red', 'met1': 'blue', 'met2': 'green', 'met3': 'orange', 'met4': 'magenta', 'met5': 'cyan' }
+layerOrient = { 'li1': 'VERTICAL', 'met1': 'HORIZONTAL', 'met2': 'VERTICAL', 'met3': 'HORIZONTAL', 'met4': 'VERTICAL', 'met5': 'HORIZONTAL' }
 
 # skip power/ground/clock nets
 skipNets = {'clk', 'VPWR', 'VGND'}
@@ -75,9 +76,9 @@ class Net:
 
 
 # interactive plotting util to view pins/obstacles/boundaries
-def plotInsts(insts, pins):
+def plotInsts(insts, pins, track):
   from matplotlib.patches import Rectangle
-  from matplotlib.collections import PatchCollection
+  from matplotlib.collections import PatchCollection, LineCollection
   import matplotlib.pyplot as plt
   xmin, ymin = 1e30, 1e30
   xmax, ymax = 0, 0
@@ -120,6 +121,7 @@ def plotInsts(insts, pins):
 
     add_patches(obsts, inst._obsts)
 
+  ca.set_aspect("equal")
   for p, lr in pins.items():
     add_patches(patches, lr)
     for layer, rects in lr.items():
@@ -132,21 +134,37 @@ def plotInsts(insts, pins):
   patchByLayer = {k:PatchCollection(v, match_original=True, alpha=0.4) for k, v in patches.items()}
   from matplotlib.widgets import CheckButtons
   colors = [layerColors[layer] for layer in patchByLayer.keys()]
+  keys = [k for k in patchByLayer.keys()]
   patchByLayer['pin labels'] = pinLabels
   colors.append('black')
+  keys.append('pin labels')
   for layer, pat in obsts.items():
     patchByLayer[f'obst({layer})'] = PatchCollection(pat, match_original=True, alpha=0.4)
     colors.append(layerColors[layer])
+    keys.append(f'obst({layer})')
 
   for k, v in patchByLayer.items():
     if k != 'pin labels': ca.add_collection(v)
+  trackCollection = dict()
+  for layer, color in layerColors.items():
+    key = f'track({layer})'
+    trackCollection[key] = LineCollection(track[layer], alpha=0.4, color = color)
+    ca.add_collection(trackCollection[key])
+    colors.append(color)
+    keys.append(key)
 
   rax = plt.axes([0.9, 0.4, 0.1, 0.15])
-  check = CheckButtons(ax=rax, labels=patchByLayer.keys(), label_props={'color': colors},
-      actives=[True for layer in patchByLayer.keys()],
+  check = CheckButtons(ax=rax, labels=keys, label_props={'color': colors},
+      actives=[True for i in keys],
       frame_props={'edgecolor': colors}, check_props={'facecolor': colors})
 
   def update(label):
+    if 'track(' in label:
+      t = trackCollection[label]
+      t.set_visible(not t.get_visible())
+      t.figure.canvas.draw_idle()
+      return
+
     ln = patchByLayer[label]
     if label != 'pin labels':
       ln.set_visible(not ln.get_visible())
@@ -312,7 +330,21 @@ def loadAndCheck(odef, idef, lef, plot):
     if net.name() in netDict:
       netDict[net.name()]._sol = net.rects()
 
-  if (plot): plotInsts(insts, pins)
+  bbox = ideff.bbox()
+  if (plot):
+    track = dict()
+    for l, orient in layerOrient.items():
+      if l in ideff.tracks():
+        ltracks = ideff.tracks()[l]
+        if orient == 'VERTICAL':
+          for t in ltracks:
+            if t.orient == 'X': break
+          track[l] = [[(t.x + i * t.step, bbox.ll.y), (t.x + i * t.step, bbox.ur.y)] for i in range(t.num)]
+        elif orient == 'HORIZONTAL':
+          for t in ltracks:
+            if t.orient == 'Y': break
+          track[l] = [[(bbox.ll.x, t.x + i * t.step), (bbox.ur.x, t.x + i * t.step)] for i in range(t.num)]
+    plotInsts(insts, pins, track)
   check(nets, insts)
 
 if __name__ == '__main__':
