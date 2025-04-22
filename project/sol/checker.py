@@ -76,7 +76,7 @@ class Net:
 
 
 # interactive plotting util to view pins/obstacles/boundaries
-def plotInsts(insts, pins, track):
+def plotInsts(insts, pins, nets, track):
   from matplotlib.patches import Rectangle
   from matplotlib.collections import PatchCollection, LineCollection
   import matplotlib.pyplot as plt
@@ -130,6 +130,12 @@ def plotInsts(insts, pins, track):
         pinLabels.append(ca.text(r.xcenter(), r.ycenter(), p))
         break
 
+  for net in nets:
+    add_patches(patches, net._sol)
+    for layer, rects in net._sol.items():
+      if len(rects):
+        r = rects[0]
+        pinLabels.append(ca.text(r.xcenter(), r.ycenter(), net._name))
 
   patchByLayer = {k:PatchCollection(v, match_original=True, alpha=0.4) for k, v in patches.items()}
   from matplotlib.widgets import CheckButtons
@@ -344,7 +350,7 @@ def loadAndCheck(odef, idef, lef, plot):
           for t in ltracks:
             if t.orient == 'Y': break
           track[l] = [[(bbox.ll.x, t.x + i * t.step), (bbox.ur.x, t.x + i * t.step)] for i in range(t.num)]
-    plotInsts(insts, pins, track)
+    plotInsts(insts, pins, nets, track)
   check(nets, insts)
 
 if __name__ == '__main__':
