@@ -214,6 +214,14 @@ def buildTree(nets, insts):
 
   return lT
 
+def bloat(r, s):
+  return Rect(r.ll.x - s, r.ll.y - s, r.ur.x + s, r.ur.y + s)
+
+# do integer overlap check; rtree stores as double that false flags non-existing overlap
+def overlaps(r, bb):
+  if r.ur.x > bb[0] and r.ll.x < bb[2] and r.ur.y > bb[1] and r.ll.y < bb[3]: return True
+  return False
+
 def checkSpacing(layerTrees, nets, insts):
 # check spacing DRC violations by querying for rectangles that overlap the shape bounding box bloated by spacing
   numViolations = 0
@@ -221,17 +229,19 @@ def checkSpacing(layerTrees, nets, insts):
     for layer, rects in net._sol.items():
       s = layerSpacing[layer]
       for r in rects:
-        nbrs = list(layerTrees[layer].intersection((r.ll.x - s, r.ll.y - s, r.ur.x + s, r.ur.y + s), objects=True))
+        rb = bloat(r, s)
+        nbrs = list(layerTrees[layer].intersection((rb.ll.x, rb.ll.y, rb.ur.x, rb.ur.y), objects=True))
         for nbr in nbrs:
           if net._id != nbr.object:
-            numViolations += 1
-            if nbr.object < len(nets):
-              print(f"[{{'net1' : '{net._name}', 'shape' : ({layer}, [{r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y}])}}, {{'net2' : '{nets[nbr.object]._name}', 'shape' : {[int(i) for i in nbr.bbox]}}}]")
-            elif nbr.object == len(nets):
+            if overlaps(rb, nbr.bbox):
               numViolations += 1
-              print(f"[{{'net1' : '{net._name}', 'shape' : ({layer}, [{r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y}])}}, {{'net2' : 'obst', 'shape' : {[int(i) for i in nbr.bbox]}}}]")
-            else:
-              assert(0)
+              if nbr.object < len(nets):
+                print(f"[{{'net1' : '{net._name}', 'shape' : ({layer}, [{r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y}])}}, {{'net2' : '{nets[nbr.object]._name}', 'shape' : ({layer}, {[round(i) for i in nbr.bbox]})}}]")
+              elif nbr.object == len(nets):
+                numViolations += 1
+                print(f"[{{'net1' : '{net._name}', 'shape' : ({layer}, [{r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y}])}}, {{'net2' : 'obst', 'shape' : ({layer}, {[round(i) for i in nbr.bbox]})}}]")
+              else:
+                assert(0)
 
   numViolations //= 2
 
