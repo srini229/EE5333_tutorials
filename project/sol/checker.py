@@ -29,7 +29,7 @@ adjLayer = {
 }
 
 layerWidth = dict()
-layerSpacing = dict()
+layerSpacing = {'li1': 170, 'met1': 140, 'met2': 140, 'met3': 300, 'met4': 300, 'met5': 1600}
 
 # instance from the component list that is transformed using the orientation and origin
 class Inst:
@@ -39,6 +39,7 @@ class Inst:
     origin = comp.location()
     self._bbox = Rect(origin.x, origin.y, origin.x + macro.xdim(), origin.y + macro.ydim())
     self._pins = dict()
+    self._markpins = dict()
     self._obsts = dict()
     for p in macro.pins():
       shapes = dict()
@@ -51,6 +52,7 @@ class Inst:
             r.transform(comp.orient(), origin, macro.xdim(), macro.ydim())
             shapes[layer].append(r)
       self._pins[p.name()] = shapes
+      self._markpins[p.name()] = False
 
     for layer, rects in macro.obstructions().items():
       if layer not in layerColors: continue
@@ -76,7 +78,7 @@ class Net:
 
 
 # interactive plotting util to view pins/obstacles/boundaries
-def plotInsts(insts, pins, nets, track):
+def plotInsts(insts, pins, nets, track, violations):
   from matplotlib.patches import Rectangle
   from matplotlib.collections import PatchCollection, LineCollection
   import matplotlib.pyplot as plt
@@ -101,11 +103,18 @@ def plotInsts(insts, pins, nets, track):
   obsts = dict()
 
   def add_patches(pats, lr):
-      for layer, rects in lr.items():
-        if layer not in pats: pats[layer] = list()
-        for r in rects:
-          patch = Rectangle((r.ll.x, r.ll.y), r.width(), r.height(), alpha=0.4, ec=layerColors[layer], facecolor=layerColors[layer])
-          pats[layer].append(patch)
+    for layer, rects in lr.items():
+      if layer not in pats: pats[layer] = list()
+      for r in rects:
+        patch = Rectangle((r.ll.x, r.ll.y), r.width(), r.height(), alpha=0.4, ec=layerColors[layer], facecolor=layerColors[layer])
+        pats[layer].append(patch)
+
+  def add_patches_c(rects, color):
+    pats = list()
+    for r in rects:
+      patch = Rectangle((r.ll.x, r.ll.y), r.width(), r.height(), alpha=0.4, ec=color, facecolor=color)
+      pats.append(patch)
+    return pats
 
   for inst in insts.values():
     ca = plt.gca()
@@ -159,6 +168,17 @@ def plotInsts(insts, pins, nets, track):
     colors.append(color)
     keys.append(key)
 
+  drcs = dict()
+  for i in range(2):
+    if len(violations[i]) == 0: continue
+    key = f"DRC({'width' if i == 0 else 'spacing'})"
+    color = 'purple' if i == 0 else 'olive'
+    keys.append(key)
+    colors.append(color)
+    pat = add_patches_c(violations[i], color)
+    drcs[key] = PatchCollection(pat, match_original=True, alpha=0.4)
+  for k, v in drcs.items(): ca.add_collection(v)
+
   rax = plt.axes([0.9, 0.4, 0.1, 0.15])
   check = CheckButtons(ax=rax, labels=keys, label_props={'color': colors},
       actives=[True for i in keys],
@@ -167,6 +187,12 @@ def plotInsts(insts, pins, nets, track):
   def update(label):
     if 'track(' in label:
       t = trackCollection[label]
+      t.set_visible(not t.get_visible())
+      t.figure.canvas.draw_idle()
+      return
+
+    if 'DRC(' in label:
+      t = drcs[label]
       t.set_visible(not t.get_visible())
       t.figure.canvas.draw_idle()
       return
@@ -188,7 +214,7 @@ def plotInsts(insts, pins, nets, track):
 #for inst in insts:
 #  print(inst._comp.name(), inst._comp.location(), inst._macro.name())
 
-def buildTree(nets, insts):
+def buildTree(nets, insts, obsts):
   import rtree
   lT = {layer: rtree.index.Index() for layer in layerColors}
   obstid = len(nets)
@@ -199,6 +225,11 @@ def buildTree(nets, insts):
       for r in rects:
         lT[layer].insert(count, (r.ll.x, r.ll.y, r.ur.x, r.ur.y), obj=obstid)
         count += 1
+
+  for layer, rects in obsts.items():
+    for r in rects:
+      lT[layer].insert(count, (r.ll.x, r.ll.y, r.ur.x, r.ur.y), obj=obstid)
+      count += 1
 
   for net in nets:
     for layer, rects in net._sol.items():
@@ -225,10 +256,17 @@ def overlaps(r, bb):
 def checkSpacing(layerTrees, nets, insts):
 # check spacing DRC violations by querying for rectangles that overlap the shape bounding box bloated by spacing
   numViolations = 0
+  widthViol = list()
+  spacingViol = list()
   for net in nets:
     for layer, rects in net._sol.items():
       s = layerSpacing[layer]
       for r in rects:
+        if r.width() < layerWidth[layer] or r.height() < layerWidth[layer]:
+          numViolations += 1
+          print(f"MinWidth violation : [{{'net1' : '{net._name}', 'shape' : ({layer}, [{r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y}])}}, min width : {layerWidth[layer]}]")
+          widthViol.append(Rect(r.ll.x, r.ll.y, r.ur.x, r.ur.y))
+
         rb = bloat(r, s)
         nbrs = list(layerTrees[layer].intersection((rb.ll.x, rb.ll.y, rb.ur.x, rb.ur.y), objects=True))
         for nbr in nbrs:
@@ -236,16 +274,18 @@ def checkSpacing(layerTrees, nets, insts):
             if overlaps(rb, nbr.bbox):
               numViolations += 1
               if nbr.object < len(nets):
-                print(f"[{{'net1' : '{net._name}', 'shape' : ({layer}, [{r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y}])}}, {{'net2' : '{nets[nbr.object]._name}', 'shape' : ({layer}, {[round(i) for i in nbr.bbox]})}}]")
+                print(f"Spacing violation : [{{'net1' : '{net._name}', 'shape' : ({layer}, [{r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y}])}}, {{'net2' : '{nets[nbr.object]._name}', 'shape' : ({layer}, {[round(i) for i in nbr.bbox]})}}]")
+                spacingViol.append(Rect(rb.ll.x, rb.ll.y, rb.ur.x, rb.ur.y))
               elif nbr.object == len(nets):
                 numViolations += 1
-                print(f"[{{'net1' : '{net._name}', 'shape' : ({layer}, [{r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y}])}}, {{'net2' : 'obst', 'shape' : ({layer}, {[round(i) for i in nbr.bbox]})}}]")
+                print(f"Spacing violation : [{{'net1' : '{net._name}', 'shape' : ({layer}, [{r.ll.x}, {r.ll.y}, {r.ur.x}, {r.ur.y}])}}, {{'net2' : 'obst', 'shape' : ({layer}, {[round(i) for i in nbr.bbox]})}}]")
+                spacingViol.append(Rect(rb.ll.x, rb.ll.y, rb.ur.x, rb.ur.y))
               else:
                 assert(0)
 
   numViolations //= 2
 
-  return numViolations
+  return numViolations, (widthViol, spacingViol)
 
 
 # add neighbours : ea
@@ -297,15 +337,38 @@ def checkConnectivity(layerTrees, nets, insts):
   return numOpens
 
 # check for spacing and connectivity violations
-def check(nets, insts):
-  layerTrees = buildTree(nets, insts)
-  nViols = checkSpacing(layerTrees, nets, insts)
+def check(nets, insts, obsts):
+  layerTrees = buildTree(nets, insts, obsts)
+  nViols, violations = checkSpacing(layerTrees, nets, insts)
   print(f"Total number of spacing violations : {nViols}")
 
   nOpens = checkConnectivity(layerTrees, nets, insts)
   print(f"Total number of nets : {len(nets)}")
   print(f"Total number of open nets : {nOpens}")
 
+  return violations
+
+
+def markUnusedPins(nets, insts, pins, obsts):
+  markpins = {k:False for k in pins}
+  for net in nets:
+    for p in net._pins:
+      if p[0] in insts:
+        insts[p[0]]._markpins[p[1]] = True
+      elif p[0] == 'PIN' and p[1] in markpins:
+        markpins[p[1]] = True
+  for p in pins:
+    if not markpins[p]:
+      for l, rects in pins[p].items():
+        if l not in obsts: obsts[l] = list()
+        for r in rects: obsts[l].append(r)
+
+  for nm, inst in insts.items():
+    for k, v in inst._markpins.items():
+      if not v:
+        for l, rects in inst._pins[k].items():
+          if l not in obsts: obsts[l] = list()
+          for r in rects: obsts[l].append(r)
 
 def loadAndCheck(odef, idef, lef, plot):
   leff = LEFDEFParser.LEFReader()
@@ -318,11 +381,11 @@ def loadAndCheck(odef, idef, lef, plot):
 
   for layer in leff.layers():
     layerWidth[layer.name()] = layer.width()
-    layerSpacing[layer.name()] = layer.pitch() - layer.width()
 
   insts = {inst.name():Inst(inst, lefDict[inst.macro()]) for inst in ideff.components() if inst.macro() not in skipCells}
 
   pins = dict()
+  markpins = dict()
   for p in ideff.pins():
     pn = p.name()
     pins[pn] = dict()
@@ -331,6 +394,7 @@ def loadAndCheck(odef, idef, lef, plot):
         if layer not in pins[pn]: pins[pn][layer] = list()
         for r in rects:
           pins[pn][layer].append(Rect(r.ll.x, r.ll.y, r.ur.x, r.ur.y))
+
 
   nets = list()
   idx = 0
@@ -346,7 +410,10 @@ def loadAndCheck(odef, idef, lef, plot):
     if net.name() in netDict:
       netDict[net.name()]._sol = net.rects()
 
+  obsts = dict()
+  markUnusedPins(nets, insts, pins, obsts)
   bbox = ideff.bbox()
+  violations = check(nets, insts, obsts)
   if (plot):
     track = dict()
     for l, orient in layerOrient.items():
@@ -360,8 +427,7 @@ def loadAndCheck(odef, idef, lef, plot):
           for t in ltracks:
             if t.orient == 'Y': break
           track[l] = [[(bbox.ll.x, t.x + i * t.step), (bbox.ur.x, t.x + i * t.step)] for i in range(t.num)]
-    plotInsts(insts, pins, nets, track)
-  check(nets, insts)
+    plotInsts(insts, pins, nets, track, violations)
 
 if __name__ == '__main__':
   import argparse
